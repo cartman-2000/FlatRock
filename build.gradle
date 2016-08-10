@@ -1,0 +1,104 @@
+def getVersionName = { ->
+    def stdout = new ByteArrayOutputStream()
+    exec {
+        commandLine 'git', 'describe', '--tags'
+        standardOutput = stdout
+    }
+    return stdout.toString().trim()
+}
+
+version = getVersionName()
+
+// Gradle repositories and dependencies
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'nl.javadude.gradle.plugins:license-gradle-plugin:0.11.0'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.3'
+    }
+}
+
+// Apply plugin
+apply plugin: 'java'
+apply plugin: 'license'
+apply plugin: 'checkstyle'
+apply plugin: 'maven'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+
+// Default tasks
+defaultTasks 'licenseFormat', 'check', 'build'
+
+// Extended project information
+ext.projectName = 'FlatRock'
+ext.inceptionYear = '2016'
+ext.packaging = 'jar'
+ext.url = 'https://github.com/cartman-2000/FlatRock'
+ext.description = 'FlatRock'
+ext.organization = 'cartman2000'
+
+// Define variables
+ext.buildNumber = project.hasProperty("buildNumber") ? buildNumber : '0'
+ext.ciSystem = project.hasProperty("ciSystem") ? ciSystem : 'unknown'
+ext.commit = project.hasProperty("commit") ? commit : 'unknown'
+
+// Project repositories
+repositories {
+    mavenCentral()
+    maven {
+        name 'Sponge maven repo'
+        url 'http://repo.spongepowered.org/maven'
+    }
+}
+
+// Project dependencies
+dependencies {
+    compile 'org.spongepowered:spongeapi:5.0.0-SNAPSHOT'
+}
+
+// Filter, process, and include resources
+processResources {
+    // Include in final JAR
+    from 'LICENSE.txt'
+}
+
+// License header formatting
+license {
+    ext.name = project.projectName
+    ext.organization = project.organization
+    ext.url = project.url
+    ext.year = project.inceptionYear
+    exclude "**/*.info"
+    exclude "assets/**"
+    header file('HEADER.txt')
+    sourceSets = project.sourceSets
+    ignoreFailures false
+    strictCheck true
+}
+
+checkstyle {
+    configProperties = [
+        "name" : project.name,
+        "organization" : project.organization,
+        "url" : project.url,
+        "year" : project.inceptionYear
+    ]
+    configFile = file("checkstyle.xml")
+}
+
+// Source compiler configuration
+configure([compileJava, compileTestJava]) {
+    options.compilerArgs += [ '-Xlint:all', '-Xlint:-path' ]
+    options.deprecation = true
+    options.encoding = 'utf8'
+}
+
+// JAR manifest configuration
+jar.manifest.mainAttributes(
+    "Built-By": System.properties['user.name'],
+    "Created-By": System.properties['java.vm.version'] + " (" + System.properties['java.vm.vendor'] + ")",
+    "Implementation-Title": name,
+    "Implementation-Version": version + "+" + ciSystem + "-b" + buildNumber + ".git-" + commit,
+    "Implementation-Vendor": url)
